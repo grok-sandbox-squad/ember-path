@@ -1,6 +1,7 @@
 // Ember Path UI. Renders with DOM nodes and textContent only (never HTML strings).
 import { createGame, legalMoves, step, isLegalMove, createRng, SIZE, MAX_SEED } from './src/rules.js';
-import { chooseMove, DIFFICULTY_LABELS } from './src/ai.js';
+import { chooseMove, DIFFICULTY_LABELS, DIFFICULTIES } from './src/ai.js';
+import { SETTINGS_KEY, getStorage, loadSettings, saveSettings, parseSettings } from './src/settings.js';
 import {
   HUMAN, COMPUTER, parseSeed, aiSeedFor, thinkDelay, describeMove, cellView, outcome, phaseOf, formatPoints, actorOf, humanMayPick, humanCanAct, turnView, introText, NOT_YOUR_PICK,
 } from './src/ui-logic.js';
@@ -102,8 +103,18 @@ function randomSeed() {
   return a[0] % (MAX_SEED + 1);
 }
 
+// The settings the next game will use. Loaded from storage (src/settings.js) at start-up and saved on
+// every change of the controls; the controls always show these, the footer shows the game's.
+const storage = getStorage(window);
+const loaded = loadSettings(storage);
+let next = loaded.settings;
+// Repair a stored value we could only partly use (never touches anything but our key).
+if (loaded.problems.length && !loaded.problems.some((p) => p === 'missing' || p === 'no storage' || p === 'read failed')) {
+  saveSettings(storage, next);
+}
+
 function settings() {
-  return { difficulty: ui.difficulty.value, computerFirst: ui.computerFirst.checked };
+  return { ...next };
 }
 
 function stopThinking() {
@@ -288,17 +299,12 @@ function updatePending() {
   }
 }
 
-// Settings the person changed on this page are kept for the next game. Anything else that
-// makes the controls disagree with the game (a browser restoring old form values after a
-// reload or back/forward, which fires no change event) is put back to the game's settings.
-let settingsTouched = false;
+// Put the controls back to the chosen settings. Covers a browser restoring old form values
+// after a reload or back/forward (that fires no change event), so the dropdown, the footer
+// and the pending-change note can't silently disagree.
 function syncControls() {
-  if (!game || settingsTouched) {
-    updatePending();
-    return;
-  }
-  ui.difficulty.value = game.difficulty;
-  ui.computerFirst.checked = game.computerFirst;
+  ui.difficulty.value = next.difficulty;
+  ui.computerFirst.checked = next.computerFirst;
   updatePending();
 }
 
@@ -313,14 +319,23 @@ ui.newGame.addEventListener('click', () => startGame(randomSeed(), { fromUser: t
 ui.playAgain.addEventListener('click', () => startGame(randomSeed(), { fromUser: true }));
 ui.replaySeed.addEventListener('click', () => startGame(game.seed, { fromUser: true }));
 const onSettingChange = () => {
-  settingsTouched = true;
-  updatePending();
+  const difficulty = ui.difficulty.value;
+  if (DIFFICULTIES.includes(difficulty)) next = { ...next, difficulty };
+  next = { ...next, computerFirst: ui.computerFirst.checked === true };
+  saveSettings(storage, next); // applies from the next game; a failed save just isn't remembered
+  syncControls();
 };
 ui.difficulty.addEventListener('change', onSettingChange);
 ui.computerFirst.addEventListener('change', onSettingChange);
 window.addEventListener('pageshow', syncControls);
 window.addEventListener('load', syncControls);
 document.addEventListener('visibilitychange', syncControls);
+// Another tab changed the remembered settings: follow them for this tab's next game too.
+window.addEventListener('storage', (e) => {
+  if (e.key !== SETTINGS_KEY) return;
+  next = parseSettings(e.newValue).settings;
+  syncControls();
+});
 ui.seed.addEventListener('input', () => showSeedError(''));
 ui.seedForm.addEventListener('submit', (e) => {
   e.preventDefault();
@@ -333,4 +348,5 @@ ui.seedForm.addEventListener('submit', (e) => {
   startGame(p.seed, { fromUser: true });
 });
 
+syncControls();
 startGame(randomSeed());

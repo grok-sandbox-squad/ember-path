@@ -26,7 +26,7 @@ When the game ends, a panel shows who won, the final scores and who had the head
 - **Normal** (the default) is greedy. It takes the most points it can right now, and on ties it leaves you the weakest reply.
 - **Hard** searches ahead with alpha-beta minimax, up to a fixed search budget, so it plans ahead, including where to pick the start and how to leave you dead ends.
 
-You can change the difficulty or tick **Computer moves first** at any time. The new settings apply when you start your next game, and a note tells you so. The game in progress is never changed, and the line under the board always shows this game's settings. Settings aren't remembered after a reload; a reloaded page starts a fresh Normal game.
+You can change the difficulty or tick **Computer moves first** at any time. The new settings apply when you start your next game, and a note tells you so. The game in progress is never changed, and the line under the board always shows this game's settings. Your difficulty and "Computer moves first" choices are remembered in this browser (localStorage key `ember-path:settings:v1`, nothing else is stored) and used for the game that starts when you reload; if storage is blocked, the game still works and just starts on Normal.
 
 ## Seeds
 
@@ -70,6 +70,6 @@ The tests cover the rules engine (the start pick, moves, the path-clear rule, sc
 - **Balance is still under review.** The second player's start pick and 1.5-point head start were added to offset the first player's advantage. A Hard-vs-Hard test keeps the first player's win rate between 40% and 60% on a fixed set of seeds, but other seeds or human play may differ.
 - Hard's search uses a fixed node budget, not a clock, so it plays the same on every device. Its start pick searches all 36 cells and takes longer than a normal move. The search runs off the main thread, so the page doesn't freeze.
 - If a browser can't start the Web Worker (very old browsers), the computer thinks on the main thread, and the page may pause briefly on Hard.
-- There's no undo, and nothing is saved between visits. Settings reset when you reload.
+- There's no undo, and games aren't saved between visits. Only the two settings are remembered.
 - The seed isn't in the page address, so to share a board you have to share the seed number.
 - It's been tested in desktop Chrome (headless) at phone and desktop sizes. It hasn't been tested yet on real phones, Safari, Firefox or with screen readers.

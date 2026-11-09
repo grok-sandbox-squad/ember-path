@@ -10,7 +10,7 @@ import {
 
 const root = new URL('../', import.meta.url);
 const read = (p) => readFileSync(new URL(p, root), 'utf8');
-const SCRIPT_FILES = ['app.js', 'src/ui-logic.js', 'src/ai-worker.js'];
+const SCRIPT_FILES = ['app.js', 'src/ui-logic.js', 'src/ai-worker.js', 'src/settings.js'];
 const PAGE_FILES = ['index.html', 'app.css', ...SCRIPT_FILES];
 
 test('page files never use HTML-string sinks or eval', () => {
