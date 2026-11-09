@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; worker-src 'self'; connect-src 'none'; font-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="Ember Path: a small turn-based game against the computer. Move the spark, grab the hottest coals.">
+  <title>Ember Path</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="app.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <main class="app">
+    <header class="top">
+      <h1>Ember Path</h1>
+      <button type="button" id="new-game" class="btn">New game</button>
+    </header>
+
+    <section class="scores" aria-label="Score">
+      <p class="score" id="score-you" data-player="0"><span class="who">You</span> <span class="pts" id="pts-you">0</span></p>
+      <p class="turn" id="turn" aria-hidden="true"></p>
+      <p class="score" id="score-cpu" data-player="1"><span class="who">Computer</span> <span class="pts" id="pts-cpu">0</span></p>
+    </section>
+
+    <p id="status" class="status" role="status" aria-live="polite" aria-atomic="true">Loading…</p>
+
+    <section id="end" class="end" hidden aria-labelledby="end-title">
+      <h2 id="end-title" tabindex="-1"></h2>
+      <p id="end-score"></p>
+      <p id="end-headstart"></p>
+      <p id="end-meta" class="meta"></p>
+      <div class="row">
+        <button type="button" id="play-again" class="btn primary">Play again</button>
+        <button type="button" id="replay-seed" class="btn">Replay this board</button>
+      </div>
+    </section>
+
+    <div id="board" class="board" role="group" aria-label="Board, 6 by 6"></div>
+    <p id="game-meta" class="meta"></p>
+
+    <details class="panel" id="how">
+      <summary>How to play</summary>
+      <ul>
+        <li>You and the computer share one spark (◆) on a 6 by 6 board of coals worth 1 to 5 points.</li>
+        <li>The second player picks where the spark starts: any cell. That cell burns out and scores nothing. The second player begins with 1.5 points; there's no end bonus.</li>
+        <li>Then take turns moving the spark 1, 2 or 3 cells in a straight line: up, down, left or right.</li>
+        <li>The spark can't jump over or land on a burned-out cell (×), and it can't leave the board.</li>
+        <li>You score the number on the cell where the spark lands, then that cell burns out.</li>
+        <li>When the player to move has no move left, the game ends. Highest score wins; the half point means there are no draws.</li>
+        <li>On your turn, the cells you can reach are outlined: tap one.</li>
+      </ul>
+    </details>
+
+    <section class="panel settings" aria-labelledby="settings-title">
+      <h2 id="settings-title">Settings</h2>
+      <div class="field">
+        <label for="difficulty">Difficulty</label>
+        <select id="difficulty">
+          <option value="easy">Easy</option>
+          <option value="normal" selected>Normal</option>
+          <option value="hard">Hard</option>
+        </select>
+      </div>
+      <div class="field check">
+        <input type="checkbox" id="computer-first">
+        <label for="computer-first">Computer moves first (you pick where the spark starts)</label>
+      </div>
+      <p id="pending" class="note" hidden>New settings start with your next game.</p>
+      <form id="seed-form" class="field seed" novalidate>
+        <label for="seed">Board seed</label>
+        <div class="row">
+          <input type="text" id="seed" inputmode="numeric" autocomplete="off" spellcheck="false" maxlength="40" aria-describedby="seed-help seed-error">
+          <button type="submit" class="btn">Play this seed</button>
+        </div>
+        <p id="seed-help" class="note">Same seed, same board. Use a whole number from 0 to 4294967295.</p>
+        <p id="seed-error" class="error" role="alert"></p>
+      </form>
+    </section>
+    <noscript><p class="error">Ember Path needs JavaScript to run.</p></noscript>
+  </main>
+</body>
+</html>
