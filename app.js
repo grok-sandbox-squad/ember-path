@@ -1,8 +1,8 @@
 // Ember Path UI. Renders with DOM nodes and textContent only (never HTML strings).
-import { createGame, legalMoves, step, isLegalMove, createRng, SIZE, MAX_SEED, KOMI } from './src/rules.js';
+import { createGame, legalMoves, step, isLegalMove, createRng, SIZE, MAX_SEED } from './src/rules.js';
 import { chooseMove, DIFFICULTY_LABELS } from './src/ai.js';
 import {
-  HUMAN, COMPUTER, parseSeed, aiSeedFor, thinkDelay, describeMove, cellView, outcome, phaseOf, formatPoints, actorOf, humanMayPick,
+  HUMAN, COMPUTER, parseSeed, aiSeedFor, thinkDelay, describeMove, cellView, outcome, phaseOf, formatPoints, actorOf, humanMayPick, humanCanAct, turnView, introText, NOT_YOUR_PICK,
 } from './src/ui-logic.js';
 
 const $ = (id) => document.getElementById(id);
@@ -112,8 +112,9 @@ function stopThinking() {
   thinking = false;
 }
 
-function startGame(seed) {
+function startGame(seed, opts = {}) {
   stopThinking();
+  const focusWasInEnd = ui.end.contains(document.activeElement);
   const { difficulty, computerFirst } = settings();
   game = {
     id: ++gameCount,
@@ -125,18 +126,19 @@ function startGame(seed) {
   ui.seed.value = String(seed);
   showSeedError('');
   ui.end.hidden = true;
-  const intro = `New game, ${DIFFICULTY_LABELS[difficulty]}, seed ${seed}.`;
-  const head = formatPoints(KOMI);
-  if (actorOf(game.state) === COMPUTER) computerTurn(`${intro} You move first, so the computer picks where the spark starts and begins with ${head} points.`);
-  else render(`${intro} Pick where the spark starts: tap any cell. It burns and scores nothing, and you begin with ${head} points. Then the computer moves first.`);
+  if (opts.fromUser) window.scrollTo(0, 0);
+  // Play again / Replay live in the end panel, which is now hidden: keep focus off <body>.
+  if (focusWasInEnd) ui.newGame.focus({ preventScroll: true });
+  const intro = introText(game.state, DIFFICULTY_LABELS[difficulty]);
+  if (actorOf(game.state) === COMPUTER) computerTurn(intro);
+  else render(intro);
 }
 
 async function computerTurn(prefix) {
   const g = game;
   const state = g.state;
-  thinking = true;
-  const what = phaseOf(state) === 'pick-start' ? 'Computer is thinking about where to start the spark…' : 'Computer is thinking…';
-  render(`${prefix} ${what}`);
+  thinking = true; // set before the first render, so the label never shows "Your turn" here
+  render(prefix);
   const delay = thinkDelay(Math.random());
   const t0 = performance.now();
   // Let the browser paint the thinking state before any search runs (matters for the
@@ -177,8 +179,7 @@ function afterMove() {
   } else if (actorOf(s) === COMPUTER) {
     computerTurn(said);
   } else {
-    const n = legalMoves(s).length;
-    render(`${said} Your turn: ${n} ${n === 1 ? 'cell is' : 'cells are'} outlined.`);
+    render(`${said} Your turn.`);
   }
 }
 
@@ -190,12 +191,16 @@ function onCellClick(e) {
     say('The game is over. Tap Play again for a new board.');
     return;
   }
-  if (thinking || actorOf(s) !== HUMAN) {
-    say(thinking ? 'Hold on, the computer is still thinking.' : "It isn't your turn.");
+  if (thinking) {
+    say('Hold on, the computer is still thinking.');
     return;
   }
   if (phaseOf(s) === 'pick-start' && !humanMayPick(s)) {
-    say("You don't pick the start in this game: the player who moves second does.");
+    say(NOT_YOUR_PICK);
+    return;
+  }
+  if (!humanCanAct(s, thinking)) {
+    say("It's the computer's turn.");
     return;
   }
   const move = { r: Number(btn.dataset.r), c: Number(btn.dataset.c) };
@@ -220,8 +225,7 @@ function render(message) {
   const s = game.state;
   const phase = phaseOf(s);
   const over = phase === 'over';
-  const actor = actorOf(s);
-  const humanToMove = !over && !thinking && actor === HUMAN && (phase !== 'pick-start' || humanMayPick(s));
+  const humanToMove = humanCanAct(s, thinking);
   const targets = new Set(humanToMove ? legalMoves(s).map((m) => m.r * SIZE + m.c) : []);
   for (const b of cells) {
     const r = Number(b.dataset.r);
@@ -244,27 +248,21 @@ function render(message) {
   ui.board.setAttribute('aria-busy', thinking ? 'true' : 'false');
   ui.ptsYou.textContent = formatPoints(s.scores[HUMAN]);
   ui.ptsCpu.textContent = formatPoints(s.scores[COMPUTER]);
-  ui.scoreYou.classList.toggle('active', actor === HUMAN);
-  ui.scoreCpu.classList.toggle('active', actor === COMPUTER);
-  ui.turn.textContent = over
-    ? 'Game over'
-    : thinking
-      ? 'Thinking…'
-      : actor !== HUMAN
-        ? 'Computer'
-        : phase === 'pick-start'
-          ? 'Pick start'
-          : 'Your turn';
+  const tv = turnView(s, thinking);
+  ui.scoreYou.classList.toggle('active', tv.who === 'human');
+  ui.scoreCpu.classList.toggle('active', tv.who === 'computer');
+  ui.turn.textContent = tv.text;
+  ui.turn.dataset.who = tv.who;
+  ui.turn.hidden = over;
   ui.turn.classList.toggle('thinking', thinking);
   const first = game.computerFirst ? 'computer moves first · you pick the start' : 'you move first · computer picks the start';
-  ui.gameMeta.textContent = `Seed ${game.seed} · ${DIFFICULTY_LABELS[game.difficulty]} · ${first}`;
+  ui.gameMeta.textContent = `This game: ${DIFFICULTY_LABELS[game.difficulty]} · seed ${game.seed} · ${first}`;
   updatePending();
   if (message !== undefined) say(message);
 }
 
 function showEnd() {
   const o = outcome(game.state);
-  const [you, cpu] = [game.state.scores[HUMAN], game.state.scores[COMPUTER]];
   ui.end.dataset.kind = o.kind;
   ui.endTitle.textContent = o.title;
   ui.endScore.textContent = o.scoreLine;
@@ -272,15 +270,36 @@ function showEnd() {
   const moves = game.state.history.filter((h) => h.from).length;
   ui.endMeta.textContent = `Seed ${game.seed} · ${DIFFICULTY_LABELS[game.difficulty]} · ${moves} moves`;
   ui.end.hidden = false;
-  const short = o.kind === 'win' ? 'You win' : o.kind === 'lose' ? 'The computer wins' : "It's a draw";
-  say(`Game over. ${short}, ${formatPoints(Math.max(you, cpu))} to ${formatPoints(Math.min(you, cpu))}.`);
+  // The result card carries the outcome; the status line just marks the end once.
+  say('Game over.');
   ui.endTitle.focus({ preventScroll: true });
   ui.end.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 
 function updatePending() {
   const s = settings();
-  ui.pending.hidden = !game || (s.difficulty === game.difficulty && s.computerFirst === game.computerFirst);
+  const same = !game || (s.difficulty === game.difficulty && s.computerFirst === game.computerFirst);
+  ui.pending.hidden = same;
+  if (!same) {
+    const parts = [];
+    if (s.difficulty !== game.difficulty) parts.push(DIFFICULTY_LABELS[s.difficulty] ?? s.difficulty);
+    if (s.computerFirst !== game.computerFirst) parts.push(s.computerFirst ? 'computer moves first' : 'you move first');
+    ui.pending.textContent = `${parts.join(', ')}: starts with your next game. Tap New game to switch now.`;
+  }
+}
+
+// Settings the person changed on this page are kept for the next game. Anything else that
+// makes the controls disagree with the game (a browser restoring old form values after a
+// reload or back/forward, which fires no change event) is put back to the game's settings.
+let settingsTouched = false;
+function syncControls() {
+  if (!game || settingsTouched) {
+    updatePending();
+    return;
+  }
+  ui.difficulty.value = game.difficulty;
+  ui.computerFirst.checked = game.computerFirst;
+  updatePending();
 }
 
 function showSeedError(msg) {
@@ -290,11 +309,18 @@ function showSeedError(msg) {
 }
 
 ui.board.addEventListener('click', onCellClick);
-ui.newGame.addEventListener('click', () => startGame(randomSeed()));
-ui.playAgain.addEventListener('click', () => startGame(randomSeed()));
-ui.replaySeed.addEventListener('click', () => startGame(game.seed));
-ui.difficulty.addEventListener('change', updatePending);
-ui.computerFirst.addEventListener('change', updatePending);
+ui.newGame.addEventListener('click', () => startGame(randomSeed(), { fromUser: true }));
+ui.playAgain.addEventListener('click', () => startGame(randomSeed(), { fromUser: true }));
+ui.replaySeed.addEventListener('click', () => startGame(game.seed, { fromUser: true }));
+const onSettingChange = () => {
+  settingsTouched = true;
+  updatePending();
+};
+ui.difficulty.addEventListener('change', onSettingChange);
+ui.computerFirst.addEventListener('change', onSettingChange);
+window.addEventListener('pageshow', syncControls);
+window.addEventListener('load', syncControls);
+document.addEventListener('visibilitychange', syncControls);
 ui.seed.addEventListener('input', () => showSeedError(''));
 ui.seedForm.addEventListener('submit', (e) => {
   e.preventDefault();
@@ -304,7 +330,7 @@ ui.seedForm.addEventListener('submit', (e) => {
     ui.seed.focus();
     return;
   }
-  startGame(p.seed);
+  startGame(p.seed, { fromUser: true });
 });
 
 startGame(randomSeed());

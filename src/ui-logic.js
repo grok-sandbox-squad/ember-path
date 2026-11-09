@@ -99,6 +99,54 @@ export function humanMayPick(state) {
   return phaseOf(state) === 'pick-start' && state.firstPlayer !== HUMAN && actorOf(state) === HUMAN;
 }
 
+/**
+ * May the person act (tap a cell) right now? False whenever the computer is thinking,
+ * whatever the state says, so the board and the turn label can't disagree.
+ * @param {any} state
+ * @param {boolean} thinking
+ */
+export function humanCanAct(state, thinking) {
+  if (thinking) return false;
+  const actor = actorOf(state);
+  if (actor !== HUMAN) return false;
+  return phaseOf(state) !== 'pick-start' || humanMayPick(state);
+}
+
+/**
+ * The turn label above the board. It is derived from the same inputs as the board
+ * (humanCanAct), so it says "Your …" only when the board really accepts a tap.
+ * @param {any} state
+ * @param {boolean} thinking
+ * @returns {{ who: 'human' | 'computer' | 'none', text: string }}
+ */
+export function turnView(state, thinking) {
+  const phase = phaseOf(state);
+  if (phase === 'over') return { who: 'none', text: '' };
+  if (humanCanAct(state, thinking)) {
+    return { who: 'human', text: phase === 'pick-start' ? 'Your pick: tap any cell' : 'Your turn' };
+  }
+  if (thinking || actorOf(state) === COMPUTER) {
+    const text = phase === 'pick-start' ? 'Computer is picking the start…' : 'Computer is thinking…';
+    return { who: 'computer', text: thinking ? text : "Computer's turn" };
+  }
+  return { who: 'none', text: '' }; // tampered state: nobody may act
+}
+
+/**
+ * Short status line at the start of a game.
+ * @param {any} state
+ * @param {string} levelLabel e.g. "Normal"
+ */
+export function introText(state, levelLabel) {
+  const head = formatPoints(KOMI);
+  return secondPlayer(state) === HUMAN
+    ? `New ${levelLabel} game. Tap any cell to start the spark there. It scores nothing, but you get ${head} points.`
+    : `New ${levelLabel} game. The computer picks the start and gets ${head} points.`;
+}
+
+/** What to say when the person taps the board during a start pick that isn't theirs. */
+export const NOT_YOUR_PICK = "Only the second player picks the start, and here that's the computer.";
+
 /** Whole and half points, cleanly: 0 -> "0", 1.5 -> "1.5", 12.5 -> "12.5". */
 export function formatPoints(n) {
   if (typeof n !== 'number' || !Number.isFinite(n)) return '0';
@@ -128,17 +176,15 @@ export function stepOf(entry) {
 }
 
 /**
- * One sentence describing a move, e.g. "Computer moved left 2 to row 3, column 1 and scored 4."
+ * One short sentence describing a move, e.g. "Computer moved left 2 and scored 4 points.""
  * @param {{ player: 0|1, from: {r:number,c:number}, to: {r:number,c:number}, value: number }} entry
  */
 export function describeMove(entry) {
   const who = playerName(entry.player);
-  if (!entry.from) {
-    return `${who} picked ${placeName(entry.to.r, entry.to.c)} as the start. The spark is there now.`;
-  }
+  if (!entry.from) return `${who} started the spark at ${placeName(entry.to.r, entry.to.c)}.`;
   const { dir, dist } = stepOf(entry);
   const pts = entry.value === 1 ? '1 point' : `${entry.value} points`;
-  return `${who} moved ${dir} ${dist} to ${placeName(entry.to.r, entry.to.c)} and scored ${pts}.`;
+  return `${who} moved ${dir} ${dist} and scored ${pts}.`;
 }
 
 /**

@@ -21,7 +21,7 @@
 
     <section class="scores" aria-label="Score">
       <p class="score" id="score-you" data-player="0"><span class="who">You</span> <span class="pts" id="pts-you">0</span></p>
-      <p class="turn" id="turn" aria-hidden="true"></p>
+      <p class="turn" id="turn" data-who="computer" aria-hidden="true">Computer is picking the start…</p>
       <p class="score" id="score-cpu" data-player="1"><span class="who">Computer</span> <span class="pts" id="pts-cpu">0</span></p>
     </section>
 
@@ -58,14 +58,14 @@
       <h2 id="settings-title">Settings</h2>
       <div class="field">
         <label for="difficulty">Difficulty</label>
-        <select id="difficulty">
+        <select id="difficulty" autocomplete="off">
           <option value="easy">Easy</option>
           <option value="normal" selected>Normal</option>
           <option value="hard">Hard</option>
         </select>
       </div>
       <div class="field check">
-        <input type="checkbox" id="computer-first">
+        <input type="checkbox" id="computer-first" autocomplete="off">
         <label for="computer-first">Computer moves first (you pick where the spark starts)</label>
       </div>
       <p id="pending" class="note" hidden>New settings start with your next game.</p>

@@ -16,7 +16,7 @@ Play it at **https://grok-sandbox-squad.github.io/ember-path/**. It has no accou
 
 By default you move first, so the computer picks the start (and gets the 1.5 points). Tick **Computer moves first** to pick the start yourself. In that case every cell is outlined, and you tap the one where the spark should start.
 
-On your turn, the cells you can reach are outlined in white with a dot in the corner, and the others fade back. Tap one to move there. With a keyboard, press Tab to move between the reachable cells and Enter to move. While the computer is thinking, the board is locked. The top bar shows the score, including the 1.5 head start, and whose turn it is. The line under it says what the last move was. The cell the spark just left has a dashed outline.
+On your turn, the cells you can reach are outlined in white with a dot in the corner, and the others fade back. Tap one to move there. With a keyboard, press Tab to move between the reachable cells and Enter to move. While the computer is picking or thinking, the label above the board says so and the board is locked. The top bar shows the score, including the 1.5 head start. The line under it says what the last move was. The cell the spark just left has a dashed outline.
 
 When the game ends, a panel shows who won, the final scores and who had the head start. From there you can **Play again** on a new board or **Replay this board**.
 
@@ -26,7 +26,7 @@ When the game ends, a panel shows who won, the final scores and who had the head
 - **Normal** (the default) is greedy. It takes the most points it can right now, and on ties it leaves you the weakest reply.
 - **Hard** searches ahead with alpha-beta minimax, up to a fixed search budget, so it plans ahead, including where to pick the start and how to leave you dead ends.
 
-You can change the difficulty or tick **Computer moves first** at any time. The new settings apply when you start your next game, and a note tells you so. The game in progress is never changed.
+You can change the difficulty or tick **Computer moves first** at any time. The new settings apply when you start your next game, and a note tells you so. The game in progress is never changed, and the line under the board always shows this game's settings. Settings aren't remembered after a reload; a reloaded page starts a fresh Normal game.
 
 ## Seeds
 

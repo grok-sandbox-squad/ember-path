@@ -240,3 +240,7 @@ input[aria-invalid="true"] { border-color: #ff8a7a; }
   .app { padding-top: 16px; }
   h1 { font-size: 1.9rem; }
 }
+
+/* Turn label: whose move it is, never ambiguous. */
+.turn[data-who="computer"] { color: #ffb38a; }
+.turn[data-who="human"]::before { content: "\25B6\FE0E  "; font-size: 0.8em; }
