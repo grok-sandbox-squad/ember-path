@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { createGame, legalMoves, step, MAX_SEED, SIZE, KOMI } from '../src/rules.js';
 import {
   HUMAN, COMPUTER, parseSeed, aiSeedFor, thinkDelay, THINK_MIN_MS, THINK_MAX_MS,
-  describeMove, stepOf, cellView, outcome, placeName, phaseOf, formatPoints, headStartText, secondPlayer, actorOf, humanMayPick, humanCanAct, turnView, introText, NOT_YOUR_PICK,
+  describeMove, stepOf, cellView, outcome, placeName, phaseOf, formatPoints, headStartText, secondPlayer, actorOf, humanMayPick, humanCanAct, turnView, introText, NOT_YOUR_PICK, nextFocusTarget,
 } from '../src/ui-logic.js';
 
 const root = new URL('../', import.meta.url);
@@ -380,4 +380,76 @@ test('settings controls cannot silently disagree with the game', () => {
   const js = read('app.js');
   for (const ev of ["'pageshow', syncControls", "'load', syncControls"]) assert.ok(js.includes(ev), ev);
   assert.match(js, /This game: \$\{DIFFICULTY_LABELS\[game\.difficulty\]\}/);
+});
+
+test('nextFocusTarget moves off a dead cell onto the first playable one', () => {
+  assert.equal(nextFocusTarget({
+    focusOnBoard: true, focusOnPlayable: false, focusOnBody: false, boardHadFocus: true,
+    hasPlayable: true, gameOver: false,
+  }), 'first-playable');
+  // Lost to body after a move that took the cell out of the tab order.
+  assert.equal(nextFocusTarget({
+    focusOnBoard: false, focusOnPlayable: false, focusOnBody: true, boardHadFocus: true,
+    hasPlayable: true, gameOver: false,
+  }), 'first-playable');
+});
+
+test('nextFocusTarget leaves focus alone when it is already on a playable cell or elsewhere', () => {
+  assert.equal(nextFocusTarget({
+    focusOnBoard: true, focusOnPlayable: true, focusOnBody: false, boardHadFocus: true,
+    hasPlayable: true, gameOver: false,
+  }), null);
+  // User is in settings / seed field / New game: do not steal.
+  assert.equal(nextFocusTarget({
+    focusOnBoard: false, focusOnPlayable: false, focusOnBody: false, boardHadFocus: false,
+    hasPlayable: true, gameOver: false,
+  }), null);
+  // Fresh page load: focus on body, never on the board yet.
+  assert.equal(nextFocusTarget({
+    focusOnBoard: false, focusOnPlayable: false, focusOnBody: true, boardHadFocus: false,
+    hasPlayable: true, gameOver: false,
+  }), null);
+});
+
+test('nextFocusTarget at game over goes to the result heading (or New game)', () => {
+  assert.equal(nextFocusTarget({
+    focusOnBoard: true, focusOnPlayable: false, focusOnBody: false, boardHadFocus: true,
+    hasPlayable: false, gameOver: true,
+  }), 'result');
+  assert.equal(nextFocusTarget({
+    focusOnBoard: true, focusOnPlayable: false, focusOnBody: false, boardHadFocus: true,
+    hasPlayable: false, gameOver: true, hasResultHeading: false,
+  }), 'new-game');
+  // During the computer's thinking there are no playable cells, but it is not game over: leave alone.
+  assert.equal(nextFocusTarget({
+    focusOnBoard: true, focusOnPlayable: false, focusOnBody: false, boardHadFocus: true,
+    hasPlayable: false, gameOver: false,
+  }), null);
+});
+
+test('nextFocusTarget ignores bad input', () => {
+  assert.equal(nextFocusTarget(null), null);
+  assert.equal(nextFocusTarget(undefined), null);
+  assert.equal(nextFocusTarget(0), null);
+});
+
+test('app.js restores board focus after a move and capitalizes the pending note', () => {
+  const js = read('app.js');
+  assert.match(js, /nextFocusTarget/);
+  assert.match(js, /restoreBoardFocus/);
+  assert.match(js, /boardHadFocus/);
+  assert.match(js, /charAt\(0\)\.toUpperCase\(\)/);
+  // Pending parts that would otherwise start lowercase get a capital first letter.
+  assert.match(js, /computer moves first/);
+});
+
+test('checkbox paints at a real 24x24 box across engines', () => {
+  const css = read('app.css');
+  assert.match(css, /input\[type="checkbox"\]/);
+  assert.match(css, /appearance:\s*none/);
+  assert.match(css, /width:\s*24px/);
+  assert.match(css, /height:\s*24px/);
+  assert.match(css, /min-width:\s*24px/);
+  assert.match(css, /min-height:\s*24px/);
+  assert.match(css, /flex:\s*0 0 24px/);
 });

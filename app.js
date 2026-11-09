@@ -3,7 +3,7 @@ import { createGame, legalMoves, step, isLegalMove, createRng, SIZE, MAX_SEED } 
 import { chooseMove, DIFFICULTY_LABELS, DIFFICULTIES } from './src/ai.js';
 import { SETTINGS_KEY, getStorage, loadSettings, saveSettings, parseSettings } from './src/settings.js';
 import {
-  HUMAN, COMPUTER, parseSeed, aiSeedFor, thinkDelay, describeMove, cellView, outcome, phaseOf, formatPoints, actorOf, humanMayPick, humanCanAct, turnView, introText, NOT_YOUR_PICK,
+  HUMAN, COMPUTER, parseSeed, aiSeedFor, thinkDelay, describeMove, cellView, outcome, phaseOf, formatPoints, actorOf, humanMayPick, humanCanAct, turnView, introText, NOT_YOUR_PICK, nextFocusTarget,
 } from './src/ui-logic.js';
 
 const $ = (id) => document.getElementById(id);
@@ -238,6 +238,10 @@ function render(message) {
   const over = phase === 'over';
   const humanToMove = humanCanAct(s, thinking);
   const targets = new Set(humanToMove ? legalMoves(s).map((m) => m.r * SIZE + m.c) : []);
+  // Remember whether a board cell held focus before we rewrite tabIndexes, so we can
+  // tell a real "focus lost to body after a move" apart from a fresh page load.
+  const activeBefore = document.activeElement;
+  const boardHadFocus = cells.includes(activeBefore);
   for (const b of cells) {
     const r = Number(b.dataset.r);
     const c = Number(b.dataset.c);
@@ -270,6 +274,32 @@ function render(message) {
   ui.gameMeta.textContent = `This game: ${DIFFICULTY_LABELS[game.difficulty]} · seed ${game.seed} · ${first}`;
   updatePending();
   if (message !== undefined) say(message);
+  restoreBoardFocus(boardHadFocus, targets.size > 0, over);
+}
+
+/** Move focus onto a playable cell (or the result / New game) when a move left it stranded. */
+function restoreBoardFocus(boardHadFocus, hasPlayable, gameOver) {
+  const active = document.activeElement;
+  const focusOnBoard = cells.includes(active);
+  const focusOnPlayable = focusOnBoard && active.dataset.kind === 'target' && active.tabIndex === 0;
+  const focusOnBody = !active || active === document.body || active === document.documentElement;
+  const where = nextFocusTarget({
+    focusOnBoard,
+    focusOnPlayable,
+    focusOnBody,
+    boardHadFocus,
+    hasPlayable,
+    gameOver,
+    hasResultHeading: !!ui.endTitle,
+  });
+  if (where === 'first-playable') {
+    const first = cells.find((b) => b.dataset.kind === 'target' && b.tabIndex === 0);
+    if (first) first.focus({ preventScroll: true });
+  } else if (where === 'result') {
+    ui.endTitle.focus({ preventScroll: true });
+  } else if (where === 'new-game') {
+    ui.newGame.focus({ preventScroll: true });
+  }
 }
 
 function showEnd() {
@@ -295,7 +325,8 @@ function updatePending() {
     const parts = [];
     if (s.difficulty !== game.difficulty) parts.push(DIFFICULTY_LABELS[s.difficulty] ?? s.difficulty);
     if (s.computerFirst !== game.computerFirst) parts.push(s.computerFirst ? 'computer moves first' : 'you move first');
-    ui.pending.textContent = `${parts.join(', ')}: starts with your next game. Tap New game to switch now.`;
+    const note = `${parts.join(', ')}: starts with your next game. Tap New game to switch now.`;
+    ui.pending.textContent = note.charAt(0).toUpperCase() + note.slice(1);
   }
 }
 
