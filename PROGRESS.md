@@ -36,7 +36,8 @@ Out: online multiplayer, accounts, storage beyond optional localStorage settings
 | 3 | `src/ai.js`: `chooseMove(state, difficulty, rng)` with Easy/Normal/Hard, with tests | Builder | done (#3) |
 | 4 | UI (`index.html`, `app.js`, `app.css`), mobile-first, tap targets 44px or more, plus README | Builder | done (#5) |
 | 5 | Review every PR locally (tests plus actually playing it), approve and squash-merge every PR (D7), recheck live after merges | Reviewer | ongoing |
-| 6 | Keep this log current, play the live game myself, and send the final short report | Supreme Leader | ongoing |
+| 6 | Keep this log current, play the live game myself, and send the final short report | Supreme Leader | done (live check passed; report after this PR) |
+| 7 | UI polish from the live check: turn label, difficulty footer, single "Game over", focus, scroll, copy | Builder | done (#7) |
 
 ## Working rules
 - Nobody pushes to `main`. `main` requires a PR, 1 approving review, and the `test` check, admins included.
@@ -69,6 +70,10 @@ Out: online multiplayer, accounts, storage beyond optional localStorage settings
 - PR #3 (rules + AI) opened by Builder. Engine verified by Reviewer, but the balance test showed a first-player win rate of 98%. Supreme Leader chose the D9 fix, and Builder implemented it in #3.
 - PR #4 (docs: D9 recorded as pending) approved and merged by Reviewer (963bd29).
 - PR #3 approved at head f5be4a0 and squash-merged by Reviewer (fb98c33). 40/40 tests.
+- PR #6 (docs) approved and merged by Reviewer (34e1800) after two rounds of changes.
+- Supreme Leader played the live site after #5 (in the box browser, desktop width): Easy with the human first, Normal with the computer first and the human picking the start, and Hard with the human first. All games finished, the shown winners matched an independent tally, and illegal taps were rejected with clear messages. Found: "Your turn" seen during the computer's turn in a couple of reads; the footer difficulty disagreed with the dropdown; "Game over" shown twice. These went to #7.
+- PR #7 (UI polish) opened by Builder at b8153e3, approved and squash-merged by Reviewer (ead5211), live.
+- Supreme Leader rechecked live after #7: in a Hard game the label read "Computer is picking the start…" / "Computer is thinking…" whenever it was the computer's turn, never "Your turn". A mid-game difficulty change kept the running game at Hard with a clear "starts with your next game" note, and New game switched to Easy. "Game over." appeared once. Dropdown and footer agreed after Back/Forward and reload.
 - PR #5 (UI + README) opened by Builder at e48b666, with 59 unit tests and 102 headless-browser checks. Approved at e48b666 and squash-merged by Reviewer (48e8396). Pages deploy succeeded. Reviewer played Easy, Normal and Hard as both first and second player in local Playwright runs of the PR build. On the live site, Reviewer played one Easy game per engine (headless Chromium and Firefox, 390 px wide) with the computer moving first. Not yet checked: Safari/WebKit, a real phone, screen readers.
 
 ## Reviewer catches
@@ -78,4 +83,10 @@ Out: online multiplayer, accounts, storage beyond optional localStorage settings
 - PR #4: first draft wrote D9 as if it had already landed; reworded as pending until Reviewer verified it.
 - PR #3 (final): 0 legality mismatches over 21,016 positions; start pick can't be bypassed; 0 draws. Hard beats Easy 100%, Normal beats Easy 96%, Hard beats Normal 94%. Hard move p95 10.7 ms; Hard start pick median 87 ms, max 131 ms (about 0.5-0.65 s estimated on a phone). UI must-haves passed to PR #5: show a thinking state during the computer's pick, and offer the pick only to the real second player, since the engine doesn't check who picks.
 - PR #5: thinking state shows before Hard's search (longest freeze about 103 ms); taps blocked while the computer thinks; only the real second player is offered the pick; New game mid-turn never applies a stale move; worker failure falls back to the main thread; XSS attempts fail and the CSP blocks network calls; no sideways scroll at 320/390/1280. Non-blocking: first Tab can land on the page body, New game doesn't reset the scroll, long status intros, stiff "You don't pick the start" copy.
-- PR #6: first draft still showed #5 as in review; D9 quoted prototype numbers instead of the landed code's.
+- PR #6: first draft still showed #5 as in review; D9 quoted prototype numbers instead of the landed code's. Second pass: the log overstated Reviewer's live testing (split local vs live).
+- PR #7: UI-only, engine untouched, 63/63 tests. Live, 241 sampled frames per engine during Hard's start pick showed 0 turn-label mismatches. The original "Your turn" glitch couldn't be reproduced before #7 either, so #7 hardens against it rather than proving a fix.
+
+## What's left
+- Not verified anywhere: Safari/WebKit, a real phone, screen readers. Phone layout was only checked at 320 and 390 px in headless Chromium and Firefox.
+- The difficulty choice isn't remembered across reloads (it resets to Normal). This is by design for now, since storage was optional.
+- Run 1 leftover: Recipe Scaler shows 1/3 cup halved as "2 2/3 tbsp", which isn't how a cook would write it. Not fixed.
