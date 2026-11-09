@@ -38,6 +38,10 @@ Out: online multiplayer, accounts, storage beyond optional localStorage settings
 | 5 | Review every PR locally (tests plus actually playing it), approve and squash-merge every PR (D7), recheck live after merges | Reviewer | ongoing |
 | 6 | Keep this log current, play the live game myself, and send the final short report | Supreme Leader | done (live check passed; report after this PR) |
 | 7 | UI polish from the live check: turn label, difficulty footer, single "Game over", focus, scroll, copy | Builder | done (#7) |
+| 8 | Follow-up: remember difficulty and who goes first (`localStorage`) | Builder | done (#9) |
+| 9 | Follow-up: a11y start-pick labels (number first) | Builder | done (#10) |
+| 10 | Follow-up: focus after a move, capitalize pending note, 24x24 checkbox | Builder | done (#11) |
+| 11 | Follow-up: independent live recheck of #9–#11 (Chromium, Firefox, WebKit) | Supreme Leader | done |
 
 ## Working rules
 - Nobody pushes to `main`. `main` requires a PR, 1 approving review, and the `test` check, admins included.
@@ -76,6 +80,16 @@ Out: online multiplayer, accounts, storage beyond optional localStorage settings
 - Supreme Leader rechecked live after #7: in a Hard game the label read "Computer is picking the start…" / "Computer is thinking…" whenever it was the computer's turn, never "Your turn". A mid-game difficulty change kept the running game at Hard with a clear "starts with your next game" note, and New game switched to Easy. "Game over." appeared once. Dropdown and footer agreed after Back/Forward and reload.
 - PR #5 (UI + README) opened by Builder at e48b666, with 59 unit tests and 102 headless-browser checks. Approved at e48b666 and squash-merged by Reviewer (48e8396). Pages deploy succeeded. Reviewer played Easy, Normal and Hard as both first and second player in local Playwright runs of the PR build. On the live site, Reviewer played one Easy game per engine (headless Chromium and Firefox, 390 px wide) with the computer moving first. Not yet checked: Safari/WebKit, a real phone, screen readers.
 
+### Follow-up (user asked to fix open items and finish checks)
+- PR #9 (remember settings): one `localStorage` key `ember-path:settings:v1`, with a fallback when storage fails or holds junk. Approved and squash-merged by Reviewer as 70bfd9c. Reviewer checked it live in Chromium and Firefox, including storage that throws.
+- PR #10 (a11y start-pick labels, number first): approved and squash-merged by Reviewer as 22b30f8. Fixed axe `label-content-name-mismatch` on the start-pick cells (Supreme Leader's checks had found it on 22–27 cells).
+- PR #11 (focus after a move + polish): focus moves to the first legal cell after a move; the pending note is capitalized; the checkbox is 24×24. Approved and squash-merged by Reviewer as 7c55b5e. Fixed a Tab-skip after moves that Supreme Leader's checks found on about 10–25% of turns.
+- Supreme Leader's independent checks on live 7c55b5e (`/workspace/sl-checks`, Playwright Chromium, Firefox and WebKit; iPhone 13 / SE profiles; headless, not real Safari):
+  - 24/24 games' winners matched a recount, and the turn label was never wrong in 9,801 samples.
+  - restore 22/22, storage 42/42 and a11y 22/22 in each engine, with axe at 0 in every phase.
+  - Builder's 120-check harness: Chromium 120/120; Firefox 116/120 and WebKit 116/120. The failures are test-tool artifacts (Firefox longtask warnings; CSP noise from the screenshot tool).
+  - Tab-skip after a move: 0/30.
+
 ## Reviewer catches
 - PR #1: possible first-player or +3 edge in odd-length games (measure it with AI-vs-AI); "Normal" vs "Medium" naming mix; the path rule wasn't explicit for 2-3 step moves. Reviewer's App gets a 403 from the branch-protection API (no admin), so Supreme Leader confirmed protection. Originality check: closest relatives are Hey! That's My Fish! and Amazons (burned tiles), and Ember Path is distinct (shared spark, landing score, +3 last-move bonus at the time; the start pick came later with D9).
 - PR #2: task #5 wording didn't match D7, and the #1 notes didn't mention the 403 (both fixed here).
@@ -86,9 +100,13 @@ Out: online multiplayer, accounts, storage beyond optional localStorage settings
 - PR #6: first draft still showed #5 as in review; D9 quoted prototype numbers instead of the landed code's. Second pass: the log overstated Reviewer's live testing (split local vs live).
 - PR #7: UI-only, engine untouched, 63/63 tests. Live, 241 sampled frames per engine during Hard's start pick showed 0 turn-label mismatches. The original "Your turn" glitch couldn't be reproduced before #7 either, so #7 hardens against it rather than proving a fix. Reviewer's testing of #7: live in Chromium and Firefox at 390 px (frame sampling, a mid-game difficulty change, one full Easy game per engine); local in Chromium and Firefox at 390 and 320 px (all levels from both seats); before #7, the old bug wasn't reproduced in 301 frames. Not covered by Reviewer: WebKit/Safari, a real phone, screen readers, Builder's 120 headless checks (Reviewer ran its own instead), Firefox reload form-restore.
 
+### Follow-up (user asked to fix open items and finish checks)
+- PR #9: settings persist across reloads via one key; junk or throwing storage falls back cleanly. Reviewer verified live in Chromium and Firefox (including storage that throws). Non-blocking: none noted beyond the later checkbox nits in #11.
+- PR #10: cell accessible names now start with the visible number (e.g. "2 points, row 1, column 1, …"). axe `label-content-name-mismatch` went to 0 in pick. Reviewer verified live in Chromium and Firefox (0 in pick; also played one full Easy game per engine). Not verified by Reviewer: a real screen reader, WebKit/Safari, Builder's 120-check harness.
+- PR #11: after a move, focus lands on the first legal cell so Tab no longer skips the board; pending note capitalized; checkbox drawn at 24×24. Reviewer verified locally and live at 390 in Chromium and Firefox (earlier-than-burned case, full keyboard games at Easy/Normal/Hard from both seats, axe 0 in every phase). Non-blocking: in forced-colors mode the checkbox's checked mark has weak contrast. Not verified by Reviewer: WebKit, a real touch device.
+
 ## What's left
-- Not verified anywhere: Safari/WebKit, a real phone, screen readers. Phone layout was only checked at 320 and 390 px in headless Chromium and Firefox.
-- Builder's 120 headless checks for #7 weren't independently run (Reviewer ran its own).
-- Firefox reload form-restore (the cause of the old footer mismatch) isn't confirmed fixed in Firefox; it was checked only in the box browser.
-- The difficulty choice isn't remembered across reloads (it resets to Normal). This is by design for now, since storage was optional.
-- Run 1 leftover: Recipe Scaler shows 1/3 cup halved as "2 2/3 tbsp", which isn't how a cook would write it. Not fixed.
+- Still unverified: a real phone, real Safari, a real screen reader, and real bfcache (only simulated). Phone layout was checked at simulated iPhone 13 / SE sizes in headless Chromium, Firefox and WebKit, not on a physical device.
+- New nits (not blocking):
+  - In forced-colors mode the checkbox's checked mark has weak contrast.
+  - No arrow-key board navigation, so the pick phase has 36 Tab stops.
