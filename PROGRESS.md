@@ -46,7 +46,7 @@ Out: online multiplayer, accounts, storage beyond optional localStorage settings
 
 ## Decisions
 - **D1. Concept.** Ember Path, described above. Picked because the rules fit in a pure module, are easy to test exhaustively, and give a real difficulty curve for a simple search AI.
-- **D2. Board.** 6x6, values 1-5 from a small seeded PRNG (mulberry32), and the start cell is fixed at row 2, col 2 (0-based). Small enough that Hard can search deeply on a phone.
+- **D2. Board.** 6x6, values 1-5 from a small seeded PRNG (mulberry32), and in the first draft the start cell was fixed at row 2, col 2 (0-based), which D9 replaced with a start pick. Small enough that Hard can search deeply on a phone.
 - **D3. Difficulties.** Easy picks a random legal move, preferring higher values about half the time. Normal is greedy: highest immediate gain, breaking ties by leaving the opponent the fewest good moves. Hard uses alpha-beta minimax on score difference, depth-limited with a time/node budget so a move takes under ~300 ms on a phone. Tests must show Hard beats Easy in most seeded games and never makes an illegal move.
 - **D4. Same stack as run 1.** No build, no deps, ES modules, `node --test`, CI with `contents: read` and SHA-pinned actions.
 - **D5. Bootstrap commit.** The auto-created README commit landed on `main` before protection could exist. Everything after goes through PRs.
