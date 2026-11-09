@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { createGame, legalMoves, step, MAX_SEED, SIZE, KOMI } from '../src/rules.js';
 import {
   HUMAN, COMPUTER, parseSeed, aiSeedFor, thinkDelay, THINK_MIN_MS, THINK_MAX_MS,
-  describeMove, stepOf, cellView, outcome, placeName, phaseOf, formatPoints, headStartText, secondPlayer, actorOf, humanMayPick,
+  describeMove, stepOf, cellView, outcome, placeName, phaseOf, formatPoints, headStartText, secondPlayer, actorOf, humanMayPick, humanCanAct, turnView, introText, NOT_YOUR_PICK,
 } from '../src/ui-logic.js';
 
 const root = new URL('../', import.meta.url);
@@ -208,11 +208,14 @@ test('only the real second player may pick the start, even in a tampered state',
 test('app.js gates pick taps on humanMayPick and paints "thinking" before the search', () => {
   const js = read('app.js');
   assert.match(js, /if \(phaseOf\(s\) === 'pick-start' && !humanMayPick\(s\)\)/);
-  assert.match(js, /if \(thinking \|\| actorOf\(s\) !== HUMAN\)/);
-  const think = js.indexOf('Computer is thinking');
-  const paint = js.indexOf('await nextPaint();');
-  const choose = js.indexOf('await ai.choose(');
-  assert.ok(think > 0 && paint > think && choose > paint, 'render thinking, yield a frame, then search');
+  assert.match(js, /if \(thinking\) \{\n    say\('Hold on/);
+  assert.match(js, /if \(!humanCanAct\(s, thinking\)\)/);
+  const fn = js.slice(js.indexOf('async function computerTurn'));
+  const think = fn.indexOf('thinking = true;');
+  const draw = fn.indexOf('render(prefix);');
+  const paint = fn.indexOf('await nextPaint();');
+  const choose = fn.indexOf('await ai.choose(');
+  assert.ok(think >= 0 && draw > think && paint > draw && choose > paint, 'set thinking, render, yield a frame, then search');
   assert.match(js, /requestAnimationFrame\(\(\) => setTimeout\(resolve, 0\)\)/);
   assert.ok(!/\.toMove\b/.test(js), 'app.js must use actorOf(), not state.toMove directly');
 });
@@ -220,13 +223,13 @@ test('app.js gates pick taps on humanMayPick and paints "thinking" before the se
 test('describeMove reads naturally for the start pick and for moves', () => {
   const g = createGame(7);
   const picked = step(g, { r: 1, c: 4 });
-  assert.equal(describeMove(picked.history[0]), 'Computer picked row 2, column 5 as the start. The spark is there now.');
+  assert.equal(describeMove(picked.history[0]), 'Computer started the spark at row 2, column 5.');
   const m = legalMoves(picked).find((x) => x.dist === 2) ?? legalMoves(picked)[0];
   const s = step(picked, m);
   const e = s.history[1];
   assert.deepEqual(stepOf(e), { dir: m.dir, dist: m.dist });
-  assert.equal(describeMove(e), `You moved ${m.dir} ${m.dist} to ${placeName(m.r, m.c)} and scored ${m.value} point${m.value === 1 ? '' : 's'}.`);
-  assert.equal(describeMove({ player: COMPUTER, from: { r: 2, c: 2 }, to: { r: 2, c: 0 }, value: 1 }), 'Computer moved left 2 to row 3, column 1 and scored 1 point.');
+  assert.equal(describeMove(e), `You moved ${m.dir} ${m.dist} and scored ${m.value} point${m.value === 1 ? '' : 's'}.`);
+  assert.equal(describeMove({ player: COMPUTER, from: { r: 2, c: 2 }, to: { r: 2, c: 0 }, value: 1 }), 'Computer moved left 2 and scored 1 point.');
 });
 
 test('cellView during the start pick: every cell is a target for the picker, numbers shown', () => {
@@ -293,4 +296,88 @@ test('outcome: win or lose with half-point scores, the head start explained, no 
     }
   }
   assert.deepEqual([...kinds].sort(), ['lose', 'win']);
+});
+
+// ---- Polish PR: turn label, status copy ----
+
+function statesAlongAGame(seed, firstPlayer) {
+  const out = [];
+  let s = createGame(seed, { firstPlayer });
+  out.push(s);
+  s = step(s, { r: seed % 6, c: (seed * 7) % 6 });
+  out.push(s);
+  while (s.phase !== 'over') {
+    s = step(s, legalMoves(s)[seed % legalMoves(s).length]);
+    out.push(s);
+  }
+  return out;
+}
+
+test('turn label says "Your …" exactly when the board accepts a tap, never while the computer acts', () => {
+  let checked = 0;
+  for (let seed = 0; seed < 30; seed++) {
+    for (const fp of [HUMAN, COMPUTER]) {
+      for (const s of statesAlongAGame(seed, fp)) {
+        for (const thinking of [false, true]) {
+          const tv = turnView(s, thinking);
+          const can = humanCanAct(s, thinking);
+          assert.equal(tv.who === 'human', can);
+          if (thinking) {
+            assert.notEqual(tv.who, 'human', 'never "Your turn" while thinking');
+            if (s.phase !== 'over') assert.match(tv.text, /^Computer is (thinking|picking the start)…$/);
+          }
+          if (actorOf(s) === COMPUTER) assert.ok(tv.who === 'computer' && /^Computer/.test(tv.text), tv.text);
+          if (s.phase === 'over') assert.deepEqual(tv, { who: 'none', text: '' });
+          checked++;
+        }
+      }
+    }
+  }
+  assert.ok(checked > 1000);
+});
+
+test('turn label copy for each situation', () => {
+  const cpuPicks = createGame(1); // you move first
+  assert.deepEqual(turnView(cpuPicks, true), { who: 'computer', text: 'Computer is picking the start…' });
+  assert.deepEqual(turnView(cpuPicks, false), { who: 'computer', text: "Computer's turn" });
+  const youPick = createGame(1, { firstPlayer: COMPUTER });
+  assert.deepEqual(turnView(youPick, false), { who: 'human', text: 'Your pick: tap any cell' });
+  // Even if thinking were left on by mistake during your pick, it's not shown as your turn.
+  assert.equal(turnView(youPick, true).who, 'computer');
+  const afterPick = step(cpuPicks, { r: 0, c: 0 });
+  assert.deepEqual(turnView(afterPick, false), { who: 'human', text: 'Your turn' });
+  const cpuMoves = step(afterPick, legalMoves(afterPick)[0]);
+  assert.deepEqual(turnView(cpuMoves, true), { who: 'computer', text: 'Computer is thinking…' });
+  // Tampered: toMove points at the first mover during the pick. Nobody may act.
+  const bad = { ...JSON.parse(JSON.stringify(cpuPicks)), toMove: HUMAN };
+  assert.equal(humanCanAct(bad, false), false);
+  assert.deepEqual(turnView(bad, false), { who: 'none', text: '' });
+});
+
+test('status copy is short and plain', () => {
+  const a = introText(createGame(1), 'Hard');
+  const b = introText(createGame(1, { firstPlayer: COMPUTER }), 'Easy');
+  assert.equal(a, 'New Hard game. The computer picks the start and gets 1.5 points.');
+  assert.equal(b, 'New Easy game. Tap any cell to start the spark there. It scores nothing, but you get 1.5 points.');
+  assert.equal(NOT_YOUR_PICK, "Only the second player picks the start, and here that's the computer.");
+  for (const t of [a, b, NOT_YOUR_PICK]) assert.ok(t.length <= 100, `${t.length}: ${t}`);
+  for (let seed = 0; seed < 10; seed++) {
+    for (const s of statesAlongAGame(seed, HUMAN).slice(1)) {
+      const line = describeMove(s.history[s.history.length - 1]);
+      assert.ok(line.length <= 50, line);
+      assert.ok(!/NaN|undefined/.test(line), line);
+    }
+  }
+  const js = read('app.js');
+  assert.ok(!/You don't pick the start/.test(js));
+  assert.equal((js.match(/Game over/g) || []).length, 1, '"Game over" appears once (status line); the card shows the result');
+});
+
+test('settings controls cannot silently disagree with the game', () => {
+  const html = read('index.html');
+  assert.match(html, /<select id="difficulty" autocomplete="off">/, 'no form-state restore on reload/back');
+  assert.match(html, /<input type="checkbox" id="computer-first" autocomplete="off">/);
+  const js = read('app.js');
+  for (const ev of ["'pageshow', syncControls", "'load', syncControls"]) assert.ok(js.includes(ev), ev);
+  assert.match(js, /This game: \$\{DIFFICULTY_LABELS\[game\.difficulty\]\}/);
 });
