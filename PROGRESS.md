@@ -84,11 +84,11 @@ Out: online multiplayer, accounts, storage beyond optional localStorage settings
 - PR #9 (remember settings): one `localStorage` key `ember-path:settings:v1`, with a fallback when storage fails or holds junk. Approved and squash-merged by Reviewer as 70bfd9c. Reviewer checked it live in Chromium and Firefox, including storage that throws.
 - PR #10 (a11y start-pick labels, number first): approved and squash-merged by Reviewer as 22b30f8. Fixed axe `label-content-name-mismatch` on the start-pick cells (Supreme Leader's checks had found it on 22–27 cells).
 - PR #11 (focus after a move + polish): focus moves to the first legal cell after a move; the pending note is capitalized; the checkbox is 24×24. Approved and squash-merged by Reviewer as 7c55b5e. Fixed a Tab-skip after moves that Supreme Leader's checks found on about 10–25% of turns.
-- Supreme Leader's independent checks on live 7c55b5e (`/workspace/sl-checks`, Playwright Chromium, Firefox and WebKit; iPhone 13 / SE profiles; headless, not real Safari):
-  - 24/24 games' winners matched a recount, and the turn label was never wrong in 9,801 samples.
-  - restore 22/22, storage 42/42 and a11y 22/22 in each engine, with axe at 0 in every phase.
+- Supreme Leader's independent checks on live 7c55b5e (`/workspace/sl-checks`, Playwright Chromium, Firefox and WebKit; headless, not real Safari):
+  - WebKit play only (iPhone 13 + SE, random+greedy runs): 24/24 games' winners matched a recount, and the turn label was never wrong in 9,801 samples.
+  - restore 22/22, storage 42/42 and a11y 22/22 in each engine, with axe at 0 in every phase. Chromium/Firefox used 390×844; WebKit restore/storage used iPhone 13; a11y used 390×844 in every engine.
   - Builder's 120-check harness: Chromium 120/120; Firefox 116/120 and WebKit 116/120. The failures are test-tool artifacts (Firefox longtask warnings; CSP noise from the screenshot tool).
-  - Tab-skip after a move: 0/30.
+  - Tab-skip after a move: 0/30 (each engine, 390×844).
 
 ## Reviewer catches
 - PR #1: possible first-player or +3 edge in odd-length games (measure it with AI-vs-AI); "Normal" vs "Medium" naming mix; the path rule wasn't explicit for 2-3 step moves. Reviewer's App gets a 403 from the branch-protection API (no admin), so Supreme Leader confirmed protection. Originality check: closest relatives are Hey! That's My Fish! and Amazons (burned tiles), and Ember Path is distinct (shared spark, landing score, +3 last-move bonus at the time; the start pick came later with D9).
@@ -106,7 +106,11 @@ Out: online multiplayer, accounts, storage beyond optional localStorage settings
 - PR #11: after a move, focus lands on the first legal cell so Tab no longer skips the board; pending note capitalized; checkbox drawn at 24×24. Reviewer verified locally and live at 390 in Chromium and Firefox (earlier-than-burned case, full keyboard games at Easy/Normal/Hard from both seats, axe 0 in every phase). Non-blocking: in forced-colors mode the checkbox's checked mark has weak contrast. Not verified by Reviewer: WebKit, a real touch device.
 
 ## What's left
-- Still unverified: a real phone, real Safari, a real screen reader, and real bfcache (only simulated). Phone layout was checked at simulated iPhone 13 / SE sizes in headless Chromium, Firefox and WebKit, not on a physical device.
+- Still unverified: a real phone, real Safari, a real screen reader, and real bfcache (only simulated). WebKit play used simulated iPhone 13 / SE; Chromium/Firefox SL checks used 390×844 (and WebKit restore used iPhone 13). Not on a physical device.
+- Reviewer did not independently run Builder's 120-check harness (SL's Chromium 120/120; Firefox/WebKit 116/120 with tool-artifact failures are above).
+- Reviewer never confirmed Firefox reload form-restore from #7 (the old footer-mismatch cause). SL restore is 22/22 in Firefox (reload/back-forward vs footer/settings), which is a different check.
+- Reviewer did not run a large settings fuzz or a two-tab persistence test for #9 (Reviewer covered live Chromium/Firefox persist + throwing storage only).
+- WebKit/Safari not verified by Reviewer (SL headless WebKit ≠ Reviewer).
 - New nits (not blocking):
   - In forced-colors mode the checkbox's checked mark has weak contrast.
   - No arrow-key board navigation, so the pick phase has 36 Tab stops.
