@@ -1,6 +1,6 @@
-// Ember Path computer opponent (D3). Pure: reads a frozen GameState, returns a move.
+// Ember Path computer opponent (D3, D9). Pure: reads a frozen GameState, returns an action.
 // Randomness only ever comes from the rng you pass in, so play is reproducible.
-import { SIZE, MAX_STEP, LAST_MOVE_BONUS, assertState, legalMoves } from './rules.js';
+import { SIZE, MAX_STEP, assertState, legalMoves } from './rules.js';
 
 /** Supported difficulty names. */
 export const DIFFICULTIES = Object.freeze(['easy', 'normal', 'hard']);
@@ -8,21 +8,24 @@ export const DIFFICULTIES = Object.freeze(['easy', 'normal', 'hard']);
 export const DIFFICULTY_LABELS = Object.freeze({ easy: 'Easy', normal: 'Normal', hard: 'Hard' });
 
 /**
- * Default Hard search budget in nodes. A node budget (not a clock) keeps Hard
- * deterministic on every device; it was sized so the slowest early position
- * takes well under 300 ms on Node 20 (see tests/ai.test.js and the PR notes).
+ * Hard's search budgets, in nodes. A node budget (not a clock) keeps Hard deterministic on
+ * every device (see tests/ai.test.js and the PR notes for timings).
+ * HARD_NODE_BUDGET is per spark move. HARD_PICK_NODE_BUDGET is the total for the start pick,
+ * split evenly over the 36 cells (16,000 each); the D9 balance numbers depend on it.
  */
 export const HARD_NODE_BUDGET = 60000;
+export const HARD_PICK_NODE_BUDGET = 36 * 16000;
 
 /**
- * Pick the computer's move.
+ * Pick the computer's action: a start pick in 'pick-start', a spark move in 'play'.
  * @param {import('./rules.js').GameState} state
  * @param {'easy' | 'normal' | 'hard'} difficulty case-insensitive, so 'Normal' works too
  * @param {() => number} rng returns floats in [0, 1), e.g. createRng(seed) from rules.js
  * @param {{ maxNodes?: number, maxTimeMs?: number, now?: () => number }} [opts]
- *   Hard only. maxNodes overrides HARD_NODE_BUDGET. maxTimeMs adds an optional wall-clock
- *   cap (off by default because it makes results depend on device speed).
- * @returns {import('./rules.js').Move | null} one of legalMoves(state), or null if the game is over
+ *   Hard only. maxNodes overrides HARD_NODE_BUDGET (moves) or HARD_PICK_NODE_BUDGET (start pick, total). maxTimeMs adds an
+ *   optional wall-clock cap (off by default because it makes results depend on device speed).
+ * @returns {import('./rules.js').Action | null} one of legalMoves(state), or null if the game is over.
+ *   Pass it to step(state, action) (or pickStart / applyMove for the matching phase).
  * @throws {TypeError} bad state, non-string difficulty, rng not a function
  * @throws {RangeError} unknown difficulty, rng output outside [0, 1), bad opts
  */
@@ -38,6 +41,7 @@ export function chooseMove(state, difficulty, rng, opts) {
   if (typeof rng !== 'function') {
     throw new TypeError('rng must be a function returning numbers in [0, 1)');
   }
+  const budget = readOpts(opts, state.phase === 'pick-start' ? HARD_PICK_NODE_BUDGET : HARD_NODE_BUDGET);
   const moves = legalMoves(state);
   if (moves.length === 0) return null;
   const draw = () => {
@@ -49,9 +53,34 @@ export function chooseMove(state, difficulty, rng, opts) {
   };
   const pick = (list) => list[Math.floor(draw() * list.length)];
 
+  if (state.phase === 'pick-start') {
+    if (level === 'easy') return easyPick(state, moves, pick);
+    if (level === 'normal') return normalPick(state, moves);
+    return hardPick(state, moves, budget);
+  }
   if (level === 'easy') return chooseEasy(moves, pick, draw);
   if (level === 'normal') return chooseNormal(state, moves, pick);
-  return chooseHard(state, moves, opts);
+  return hardMove(state, moves, budget);
+}
+
+function readOpts(opts, defaultNodes) {
+  const out = { maxNodes: defaultNodes, deadline: Infinity, now: null };
+  if (opts === undefined) return out;
+  if (opts === null || typeof opts !== 'object') throw new TypeError('opts must be an object if given');
+  if (opts.maxNodes !== undefined) {
+    if (!Number.isInteger(opts.maxNodes) || opts.maxNodes < 1) {
+      throw new RangeError('opts.maxNodes must be a positive integer');
+    }
+    out.maxNodes = opts.maxNodes;
+  }
+  if (opts.maxTimeMs !== undefined) {
+    if (typeof opts.maxTimeMs !== 'number' || !(opts.maxTimeMs > 0)) {
+      throw new RangeError('opts.maxTimeMs must be a positive number');
+    }
+    out.now = typeof opts.now === 'function' ? opts.now : () => performance.now();
+    out.deadline = out.now() + opts.maxTimeMs;
+  }
+  return out;
 }
 
 // Easy: random legal move, but about half the time it takes one of the highest-value moves.
@@ -63,8 +92,8 @@ function chooseEasy(moves, pick, draw) {
   return pick(moves);
 }
 
-// Normal: greedy. Highest immediate gain (landing value, +3 if the move ends the game).
-// Ties: smallest best reply for the opponent, then fewest opponent replies, then rng.
+// Normal: greedy. Highest immediate gain; ties: smallest best reply for the opponent,
+// then fewest opponent replies, then rng.
 function chooseNormal(state, moves, pick) {
   const b = toBoard(state);
   let bestKey = null;
@@ -74,15 +103,9 @@ function chooseNormal(state, moves, pick) {
     b[to] = 0;
     const replies = gen(b, to);
     let oppBest = 0;
-    for (const x of replies) {
-      const v = b[x];
-      b[x] = 0;
-      const g = v + (gen(b, x).length === 0 ? LAST_MOVE_BONUS : 0);
-      b[x] = v;
-      if (g > oppBest) oppBest = g;
-    }
+    for (const x of replies) if (b[x] > oppBest) oppBest = b[x];
     b[to] = m.value;
-    const key = [m.value + (replies.length === 0 ? LAST_MOVE_BONUS : 0), -oppBest, -replies.length];
+    const key = [m.value, -oppBest, -replies.length];
     const cmp = bestKey === null ? 1 : compareKeys(key, bestKey);
     if (cmp > 0) {
       bestKey = key;
@@ -94,45 +117,92 @@ function chooseNormal(state, moves, pick) {
   return pick(best);
 }
 
+// Cheap start-pick score: lower is better for the picker. The first player's best immediate
+// move from that cell, then how many moves they have, then the total they could reach.
+function pickKey(b, cell) {
+  const saved = b[cell];
+  b[cell] = 0;
+  const ms = gen(b, cell);
+  let best = 0;
+  let sum = 0;
+  for (const x of ms) {
+    if (b[x] > best) best = b[x];
+    sum += b[x];
+  }
+  b[cell] = saved;
+  return [best, ms.length, sum];
+}
+
+function rankPicks(state, picks) {
+  const b = toBoard(state);
+  const scored = picks.map((p, i) => ({ p, key: pickKey(b, p.r * SIZE + p.c), i }));
+  // ascending key, then row-major order: fully deterministic
+  scored.sort((x, y) => compareKeys(x.key, y.key) || x.i - y.i);
+  return scored.map((x) => x.p);
+}
+
+// Normal start pick: the best cell by the cheap score (deterministic, no rng).
+function normalPick(state, picks) {
+  return rankPicks(state, picks)[0];
+}
+
+// Easy start pick: uniformly random among the better half of cells by the cheap score.
+function easyPick(state, picks, pick) {
+  const ranked = rankPicks(state, picks);
+  return pick(ranked.slice(0, Math.ceil(ranked.length / 2)));
+}
+
 function compareKeys(a, b) {
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] - b[i];
   return 0;
 }
 
 // Hard: negamax alpha-beta on score difference with iterative deepening and a node budget.
+// Komi is a constant offset, so it does not change which move maximises the score difference.
 const OUT_OF_BUDGET = Symbol('out of budget');
 
-function chooseHard(state, moves, opts) {
-  let maxNodes = HARD_NODE_BUDGET;
-  let deadline = Infinity;
-  let now = null;
-  if (opts !== undefined) {
-    if (opts === null || typeof opts !== 'object') throw new TypeError('opts must be an object if given');
-    if (opts.maxNodes !== undefined) {
-      if (!Number.isInteger(opts.maxNodes) || opts.maxNodes < 1) {
-        throw new RangeError('opts.maxNodes must be a positive integer');
-      }
-      maxNodes = opts.maxNodes;
-    }
-    if (opts.maxTimeMs !== undefined) {
-      if (typeof opts.maxTimeMs !== 'number' || !(opts.maxTimeMs > 0)) {
-        throw new RangeError('opts.maxTimeMs must be a positive number');
-      }
-      now = typeof opts.now === 'function' ? opts.now : () => performance.now();
-      deadline = now() + opts.maxTimeMs;
+function hardMove(state, moves, budget) {
+  if (moves.length === 1) return moves[0];
+  const b = toBoard(state);
+  const pos = state.spark.r * SIZE + state.spark.c;
+  return searchFrom(b, pos, moves, budget).move;
+}
+
+// Start pick: search every cell independently with an equal share of the budget, and take
+// the cell where the first player's best (minimax) score difference is lowest. Ties go to the
+// earlier cell in row-major order. The first player always has at least 3 moves after a pick.
+function hardPick(state, picks, budget) {
+  const per = Math.max(1, Math.floor(budget.maxNodes / picks.length));
+  let best = picks[0];
+  let bestValue = Infinity;
+  for (const p of picks) {
+    const b = toBoard(state);
+    const cell = p.r * SIZE + p.c;
+    b[cell] = 0;
+    const moves = gen(b, cell).map((to) => ({ r: (to / SIZE) | 0, c: to % SIZE, value: b[to] }));
+    const { score } = searchFrom(b, cell, moves, { ...budget, maxNodes: per });
+    if (score < bestValue) {
+      bestValue = score;
+      best = p;
     }
   }
-  if (moves.length === 1) return moves[0];
+  return best;
+}
 
-  const b = toBoard(state);
+/**
+ * Iterative-deepening alpha-beta from `pos` (side to move) over root `moves` ({ r, c, value }).
+ * Returns the chosen move and its score (side to move's future score difference; exact when
+ * the search reached the end of the game, otherwise depth-limited with a 0 leaf estimate).
+ */
+function searchFrom(b, pos, moves, { maxNodes, deadline, now }) {
   let nodes = 0;
   let hitDepthLimit = false;
 
-  function negamax(pos, depth, alpha, beta) {
+  function negamax(p, depth, alpha, beta) {
     if (++nodes > maxNodes) throw OUT_OF_BUDGET;
     if (now !== null && (nodes & 1023) === 0 && now() > deadline) throw OUT_OF_BUDGET;
-    const ms = gen(b, pos);
-    if (ms.length === 0) return -LAST_MOVE_BONUS; // opponent made the last move
+    const ms = gen(b, p);
+    if (ms.length === 0) return 0; // no end bonus (D9)
     if (depth === 0) {
       hitDepthLimit = true;
       return 0;
@@ -153,9 +223,11 @@ function chooseHard(state, moves, opts) {
   }
 
   // Root order: highest value first; stable on legalMoves order for ties.
-  let order = moves.map((m) => m).sort((x, y) => y.value - x.value);
+  let order = moves.slice().sort((x, y) => y.value - x.value);
   let bestMove = order[0];
-  const empties = b.reduce((n, v) => n + (v > 0 ? 1 : 0), 0);
+  let bestScore = 0;
+  let empties = 0;
+  for (let i = 0; i < b.length; i++) if (b[i] > 0) empties++;
   for (let depth = 1; depth <= empties; depth++) {
     hitDepthLimit = false;
     let iterBest = null;
@@ -182,17 +254,22 @@ function chooseHard(state, moves, opts) {
     } catch (e) {
       if (e !== OUT_OF_BUDGET) throw e;
       // Partial iteration: trust it only if it already beat the previous best move,
-      // which is searched first, at this depth.
-      if (iterBest !== null && iterBest !== order[0] && iterScore > -Infinity) bestMove = iterBest;
+      // which is searched first, at this depth. (A cut-off skips inner restores, so the
+      // board is not reused after this.)
+      if (iterBest !== null && iterBest !== order[0]) {
+        bestMove = iterBest;
+        bestScore = iterScore;
+      }
       break;
     }
     bestMove = iterBest;
+    bestScore = iterScore;
     // Next iteration: previous best first, then the rest by this iteration's score.
     scored.sort((x, y) => y[1] - x[1]);
     order = scored.map((x) => x[0]);
     if (!hitDepthLimit) break; // searched to the end of the game: exact
   }
-  return bestMove;
+  return { move: bestMove, score: bestScore };
 }
 
 // Internal board: cell value, or 0 if burned.

@@ -1,13 +1,14 @@
 // Shared test helpers (not a test file itself).
-import { createGame, SIZE } from '../src/rules.js';
+import { createGame, pickStart, SIZE, KOMI } from '../src/rules.js';
 
 /**
- * Build a custom position as a plain (unfrozen) state object, starting from a real game.
+ * Build a custom 'play'-phase position as a plain (unfrozen) state object, starting from a real game.
+ * Defaults: player 0 moves first and is to move, scores [0, KOMI].
  * @param {{ values?: number[], burned?: Array<[number, number]>, clearAll?: boolean,
  *   spark?: [number, number], toMove?: 0 | 1, scores?: [number, number] }} o
  */
 export function makeState(o = {}) {
-  const s = JSON.parse(JSON.stringify(createGame(1)));
+  const s = JSON.parse(JSON.stringify(pickStart(createGame(1), { r: 2, c: 2 })));
   if (o.values) s.values = o.values.slice();
   if (o.clearAll) s.burned = new Array(SIZE * SIZE).fill(false);
   for (const [r, c] of o.burned ?? []) s.burned[r * SIZE + c] = true;
@@ -16,7 +17,7 @@ export function makeState(o = {}) {
     s.burned[o.spark[0] * SIZE + o.spark[1]] = true;
   }
   if (o.toMove !== undefined) s.toMove = o.toMove;
-  if (o.scores) s.scores = o.scores.slice();
+  s.scores = o.scores ? o.scores.slice() : [0, KOMI];
   return s;
 }
 
