@@ -1,0 +1,9 @@
+{
+  "name": "ember-path",
+  "private": true,
+  "type": "module",
+  "description": "Ember Path: a small original turn-based browser game against the computer.",
+  "scripts": {
+    "test": "node --test"
+  }
+}
