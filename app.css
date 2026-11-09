@@ -1,0 +1,242 @@
+/* Ember Path. Mobile first, system fonts only, no external assets. */
+:root {
+  --bg: #17110f;
+  --panel: #241a16;
+  --ink: #f6eee8;
+  --muted: #c9b8ab;
+  --line: #4a3a33;
+  --accent: #ffd166;
+  --focus: #7fd1ff;
+  --gap: 4px;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.app {
+  max-width: 34rem;
+  margin: 0 auto;
+  padding: 8px 8px 32px;
+}
+
+h1, h2 { margin: 0; line-height: 1.2; }
+h1 { font-size: 1.5rem; color: var(--accent); letter-spacing: 0.02em; }
+h2 { font-size: 1.15rem; }
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+.btn {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 16px;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #2a1a00; }
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Score bar */
+.scores {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  gap: 4px 8px;
+  margin-bottom: 4px;
+}
+.score {
+  margin: 0;
+  padding: 6px 10px;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+.score .who { color: var(--muted); font-size: 0.95rem; white-space: nowrap; }
+.score .pts { font-size: 1.4rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.score.active { border-color: var(--accent); }
+.score.active .who::before { content: "\25B6\FE0E  "; color: var(--accent); font-size: 0.8em; }
+.turn { grid-column: 1 / -1; grid-row: 2; margin: 0; text-align: center; font-weight: 600; font-size: 0.95rem; color: var(--accent); white-space: nowrap; }
+.turn.thinking::after { content: ""; display: inline-block; width: 0.6em; height: 0.6em; margin-left: 4px; border-radius: 50%; background: var(--accent); animation: pulse 0.8s ease-in-out infinite alternate; }
+
+.status {
+  margin: 4px 0 8px;
+  min-height: 2.8em;
+  color: var(--ink);
+  font-size: 0.95rem;
+}
+
+/* Board */
+.board {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(44px, 1fr));
+  gap: var(--gap);
+  width: 100%;
+  max-width: 30rem;
+  margin: 0 auto;
+  padding: 6px;
+  border-radius: 12px;
+  background: #0d0908;
+}
+
+.cell {
+  aspect-ratio: 1;
+  min-height: 44px;
+  min-width: 44px;
+  border: 3px solid transparent;
+  border-radius: 8px;
+  padding: 0;
+  font: inherit;
+  font-size: clamp(1.1rem, 5vw, 1.6rem);
+  font-weight: 700;
+  color: #1d0f05;
+  cursor: default;
+  position: relative;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.12s ease, opacity 0.2s ease;
+}
+
+/* Coal heat by value. The number itself is always shown, so colour is only a hint. */
+.cell[data-v="1"] { background: #6b2a1a; color: #fbe3d6; }
+.cell[data-v="2"] { background: #9a3412; color: #fff1e6; }
+.cell[data-v="3"] { background: #d9541a; color: #1d0f05; }
+.cell[data-v="4"] { background: #f08a24; color: #1d0f05; }
+.cell[data-v="5"] { background: #ffc94a; color: #1d0f05; }
+
+.cell[data-kind="burned"] {
+  background: #221a17;
+  color: #6f625c;
+  border: 2px dashed #3b302b;
+  font-size: clamp(1rem, 4.5vw, 1.4rem);
+}
+
+.cell[data-kind="spark"] {
+  background: #0f1c26;
+  color: var(--accent);
+  border-color: var(--accent);
+  font-size: clamp(1.3rem, 6vw, 1.9rem);
+  box-shadow: 0 0 12px 2px rgba(255, 209, 102, 0.45);
+}
+
+/* On your turn, cells you can't reach fade back and reachable ones get a ring and a corner dot. */
+.board.your-turn .cell[data-kind="coal"] { opacity: 0.45; }
+.cell[data-kind="target"] {
+  cursor: pointer;
+  border-color: #fff;
+  box-shadow: 0 0 0 2px #000, 0 0 10px 2px rgba(255, 255, 255, 0.5);
+}
+.cell[data-kind="target"]::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 1px #000;
+}
+.cell[data-kind="target"]:hover { transform: scale(1.05); }
+.cell[data-kind="target"]:active { transform: scale(0.95); }
+.cell.last-from { outline: 2px dashed var(--accent); outline-offset: -6px; }
+.cell[data-kind="spark"].last-to { animation: glow 0.5s ease-out 1; }
+
+.board.locked { cursor: progress; }
+
+.meta { color: var(--muted); font-size: 0.85rem; text-align: center; margin: 6px 0; }
+
+/* End screen */
+.end {
+  margin: 8px 0;
+  padding: 12px;
+  border: 3px solid var(--accent);
+  border-radius: 12px;
+  background: var(--panel);
+  text-align: center;
+}
+.end[data-kind="lose"] { border-color: #e2725b; }
+.end[data-kind="draw"] { border-color: var(--muted); }
+.end h2 { font-size: 1.5rem; outline-offset: 4px; }
+.end p { margin: 6px 0; }
+.end .row { justify-content: center; margin-top: 10px; }
+
+/* Panels */
+.panel {
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+.panel summary { cursor: pointer; font-weight: 700; min-height: 44px; display: flex; align-items: center; }
+.panel ul { margin: 8px 0 0; padding-left: 1.2em; }
+.panel li { margin: 4px 0; }
+
+.settings h2 { margin-bottom: 8px; }
+.field { margin: 10px 0; }
+.field > label { display: block; font-weight: 600; margin-bottom: 4px; }
+.field.check { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.field.check label { margin: 0; cursor: pointer; }
+.field.check input { width: 24px; height: 24px; margin: 0; accent-color: var(--accent); }
+
+select, input[type="text"] {
+  min-height: 44px;
+  padding: 0 10px;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  background: #120d0b;
+  color: var(--ink);
+  font: inherit;
+  font-size: 1rem; /* 16px avoids iOS zoom on focus */
+}
+select { min-width: 10rem; }
+.seed input { flex: 1 1 9rem; min-width: 0; font-variant-numeric: tabular-nums; }
+input[aria-invalid="true"] { border-color: #ff8a7a; }
+
+.note { color: var(--muted); font-size: 0.85rem; margin: 6px 0 0; }
+#pending { color: var(--accent); }
+.error { color: #ffb4a8; font-weight: 600; margin: 6px 0 0; }
+.error:empty { display: none; }
+
+@keyframes pulse { from { opacity: 0.25; } to { opacity: 1; } }
+@keyframes glow { from { box-shadow: 0 0 22px 8px rgba(255, 209, 102, 0.9); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+@media (min-width: 40rem) {
+  .app { padding-top: 16px; }
+  h1 { font-size: 1.9rem; }
+}
