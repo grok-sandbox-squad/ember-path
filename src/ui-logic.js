@@ -189,6 +189,11 @@ export function describeMove(entry) {
 
 /**
  * How a cell should look and be announced.
+ * Accessible names start with the cell's visible number ("3 points, row 1, column 2, …"),
+ * so the visible text is part of the name in the same order (WCAG 2.5.3) and a screen
+ * reader user hears the value first, like a sighted player sees it. No parentheses.
+ * Spark (◆) and burned (×) cells show a symbol, not a number; their names say what the
+ * symbol means instead of reading the glyph out.
  * @param {import('./rules.js').GameState} state
  * @param {number} r
  * @param {number} c
@@ -202,7 +207,7 @@ export function cellView(state, r, c, ctx) {
   const pts = v === 1 ? '1 point' : `${v} points`;
   if (phaseOf(state) === 'pick-start') {
     if (ctx.humanToMove && ctx.targets.has(i)) {
-      return { kind: 'target', text: String(v), label: `Start the spark here: ${where} (${pts}, not scored)`, lastFrom: false };
+      return { kind: 'target', text: String(v), label: `${pts}, ${where}, start the spark here, not scored`, lastFrom: false };
     }
     return { kind: 'coal', text: String(v), label: `${pts}, ${where}`, lastFrom: false };
   }
@@ -218,7 +223,7 @@ export function cellView(state, r, c, ctx) {
     return { kind: 'burned', text: '\u00D7', label: `Burned out, ${where}${lastNote}`, lastFrom };
   }
   if (ctx.humanToMove && ctx.targets.has(i)) {
-    return { kind: 'target', text: String(v), label: `Move here: ${where}, ${pts}${lastNote}`, lastFrom };
+    return { kind: 'target', text: String(v), label: `${pts}, ${where}, move here${lastNote}`, lastFrom };
   }
   return { kind: 'coal', text: String(v), label: `${pts}, ${where}${lastNote}`, lastFrom };
 }
