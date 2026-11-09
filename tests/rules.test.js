@@ -137,6 +137,7 @@ test('bad state: null, undefined, junk and broken shapes throw TypeError everywh
     for (const fn of [legalMoves, isOver, result, assertState, (x) => applyMove(x, { r: 1, c: 2 })]) {
       assert.throws(() => fn(s), TypeError);
     }
+    assert.equal(isLegalMove(s, { r: 1, c: 2 }), false, 'isLegalMove never throws');
   }
 });
 

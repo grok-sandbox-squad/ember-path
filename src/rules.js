@@ -210,12 +210,17 @@ export function legalMoves(state) {
 }
 
 /**
- * Is `move` legal? Never throws for malformed input (returns false).
- * @param {GameState} state
+ * Is `move` legal? Never throws: a malformed state or move just returns false.
+ * @param {unknown} state
  * @param {unknown} move
  * @returns {boolean}
  */
 export function isLegalMove(state, move) {
+  try {
+    assertState(state);
+  } catch {
+    return false;
+  }
   if (!move || typeof move !== 'object') return false;
   const m = /** @type {any} */ (move);
   if (!onBoard(m.r, m.c)) return false;
