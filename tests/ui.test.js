@@ -241,7 +241,7 @@ test('cellView during the start pick: every cell is a target for the picker, num
       const v = cellView(g, r, c, { targets, humanToMove: true });
       assert.equal(v.kind, 'target');
       assert.equal(v.text, String(g.values[r * SIZE + c]));
-      assert.match(v.label, /^Start the spark here: .*not scored\)$/);
+      assert.match(v.label, /^\d points?, row \d, column \d, start the spark here, not scored$/);
     }
   }
   assert.equal(cellView(g, 0, 0, { targets, humanToMove: false }).kind, 'coal');
@@ -256,7 +256,7 @@ test('cellView in play marks spark, burned, targets and plain coals with text, n
       const v = cellView(g, r, c, { targets, humanToMove: true });
       kinds[v.kind]++;
       assert.ok(v.text.length > 0 && v.label.includes(placeName(r, c)));
-      if (v.kind === 'target') assert.match(v.label, /^Move here/);
+      if (v.kind === 'target') assert.match(v.label, /^\d points?, row \d, column \d, move here/);
       if (v.kind === 'coal' || v.kind === 'target') assert.equal(v.text, String(g.values[r * SIZE + c]));
     }
   }
