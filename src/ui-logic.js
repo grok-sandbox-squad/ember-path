@@ -257,4 +257,33 @@ export function headStartText(state) {
   return `${who} picked the start and began with ${formatPoints(KOMI)} points.`;
 }
 
+
+/**
+ * Where to put keyboard focus after the board is redrawn.
+ * Only intervene when focus is stuck on a board cell that is no longer playable,
+ * or was lost to <body> after a cell that had focus stopped being tabbable.
+ * Never steal focus from settings, the seed field, New game, etc., and never on a
+ * fresh page load (focus on body with no prior board focus).
+ *
+ * @param {{
+ *   focusOnBoard: boolean,
+ *   focusOnPlayable: boolean,
+ *   focusOnBody: boolean,
+ *   boardHadFocus: boolean,
+ *   hasPlayable: boolean,
+ *   gameOver: boolean,
+ *   hasResultHeading?: boolean,
+ * }} s
+ * @returns {'first-playable' | 'result' | 'new-game' | null}
+ */
+export function nextFocusTarget(s) {
+  if (!s || typeof s !== 'object') return null;
+  const stuckOnDeadCell = s.focusOnBoard && !s.focusOnPlayable;
+  const lostToBody = s.focusOnBody && s.boardHadFocus;
+  if (!stuckOnDeadCell && !lostToBody) return null;
+  if (s.hasPlayable) return 'first-playable';
+  if (s.gameOver) return s.hasResultHeading === false ? 'new-game' : 'result';
+  return null; // computer thinking / locked board: leave focus alone
+}
+
 export { KOMI, MAX_SEED, SIZE };
